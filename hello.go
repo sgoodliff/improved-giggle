@@ -4,5 +4,5 @@ package hello
 
 // returns a string
 func hello() string {
-  return "Hello Go 2!"
+  return "Hello Go!"
 }
