@@ -4,12 +4,29 @@ import (
 	"flag"
 	"fmt"
 	"html/template"
-	"log"
+	"math/rand"
 	"net/http"
+	"os"
+	"strconv"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/sgoodliff/hello"
+
+	log "github.com/sirupsen/logrus"
 )
+
+func init() {
+	// Log as JSON instead of the default ASCII formatter.
+	log.SetFormatter(&log.JSONFormatter{})
+
+	// Output to stdout instead of the default stderr
+	// Can be any io.Writer, see below for File example
+	log.SetOutput(os.Stdout)
+
+	// Only log the warning severity or above.
+	log.SetLevel(log.DebugLevel)
+}
 
 var addr = flag.String("addr", "localhost:8080", "http service address")
 
@@ -40,19 +57,68 @@ func echo(w http.ResponseWriter, r *http.Request) {
 func home(w http.ResponseWriter, r *http.Request) {
 	homeTemplate.Execute(w, "ws://"+r.Host+"/echo")
 }
+func balance(w http.ResponseWriter, r *http.Request) {
+	c, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Print("upgrade:", err)
+		return
+	}
+	defer c.Close()
+	for {
+		mt, message, err := c.ReadMessage()
+		if err != nil {
+			log.Println("read:", err)
+			break
+		}
+		log.Printf("recv: %s", message)
+		err = c.WriteMessage(mt, message)
+		if err != nil {
+			log.Println("write:", err)
+			break
+		}
+	}
+}
+
+func getBalance(userid int) int {
+	var balance int
+	balance = rand.Intn(100)
+	log.Debug("Balance for " + strconv.Itoa(userid) + " = " + strconv.Itoa(balance))
+	return balance
+}
+
+func updateData() {
+	balances := make(map[int]int)
+	var balance int
+	for {
+		for i := 0; i < 100; i++ {
+			balance = getBalance(i)
+			if balance != balances[i] {
+				log.Debug("Current balance has changed")
+				balances[i] = balance
+				// we need to push this to client
+
+			}
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
+}
 
 func main() {
 
-	fmt.Printf("Hello, World")
+	log.Info("Hello, World")
 	var x string
 	x = hello.Hello()
 	fmt.Printf(x)
 
 	flag.Parse()
-	log.SetFlags(0)
+
+	go updateData()
+
 	http.HandleFunc("/echo", echo)
 	http.HandleFunc("/", home)
+	http.HandleFunc("/balance", balance)
 	log.Fatal(http.ListenAndServe(*addr, nil))
+
 }
 
 var homeTemplate = template.Must(template.New("").Parse(`
