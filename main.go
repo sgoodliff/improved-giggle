@@ -79,7 +79,7 @@ func balance(w http.ResponseWriter, r *http.Request) {
 	}
 }
 func pushBalance(userid int,balance int) {
-	log.Debug("Pushing " + balance + "to" + userid )
+	log.Debug("Pushing " + strconv.Itoa(balance) + " to " + strconv.Itoa(userid) )
 }
 func getBalance(userid int) int {
 	var balance int
