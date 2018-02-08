@@ -78,7 +78,9 @@ func balance(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 }
-
+func pushBalance(userid int,balance int) {
+	log.Debug("Pushing " + strconv.Itoa(balance) + " to " + strconv.Itoa(userid) )
+}
 func getBalance(userid int) int {
 	var balance int
 	balance = rand.Intn(100)
@@ -96,7 +98,7 @@ func updateData() {
 				log.Debug("Current balance has changed")
 				balances[i] = balance
 				// we need to push this to client
-
+				pushBalance(i,balance)
 			}
 		}
 		time.Sleep(300 * time.Millisecond)
