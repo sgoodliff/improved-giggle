@@ -58,20 +58,23 @@ func home(w http.ResponseWriter, r *http.Request) {
 	homeTemplate.Execute(w, "ws://"+r.Host+"/echo")
 }
 func balance(w http.ResponseWriter, r *http.Request) {
+	var sendmessage string = "test message"
 	c, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Print("upgrade:", err)
+		log.Print("balance upgrade:", err)
 		return
 	}
 	defer c.Close()
 	for {
 		mt, message, err := c.ReadMessage()
-		if err != nil {
-			log.Println("read:", err)
-			break
-		}
-		log.Printf("recv: %s", message)
-		err = c.WriteMessage(mt, message)
+                if err != nil {
+                        log.Println("read:", err)
+                        break
+                }
+		log.Debug(message)
+		
+
+		err = c.WriteMessage(mt, []byte(sendmessage))
 		if err != nil {
 			log.Println("write:", err)
 			break
@@ -101,7 +104,7 @@ func updateData() {
 				pushBalance(i,balance)
 			}
 		}
-		time.Sleep(300 * time.Millisecond)
+		time.Sleep(1000 * time.Millisecond)
 	}
 }
 
@@ -114,7 +117,7 @@ func main() {
 
 	flag.Parse()
 
-	go updateData()
+	//go updateData()
 
 	http.HandleFunc("/echo", echo)
 	http.HandleFunc("/", home)
