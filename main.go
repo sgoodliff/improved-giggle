@@ -4,15 +4,14 @@ import (
 	"flag"
 	"fmt"
 	"html/template"
-	"math/rand"
 	"net/http"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/sgoodliff/hello"
 
+	"github.com/sgoodliff/improved-giggle/balance"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -53,12 +52,8 @@ func echo(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 }
-
-func home(w http.ResponseWriter, r *http.Request) {
-	homeTemplate.Execute(w, "ws://"+r.Host+"/echo")
-}
-func balance(w http.ResponseWriter, r *http.Request) {
-	var sendmessage string = "test message"
+func balanceHandler(w http.ResponseWriter, r *http.Request) {
+	var sendmessage = "test message"
 	c, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Print("balance upgrade:", err)
@@ -67,12 +62,11 @@ func balance(w http.ResponseWriter, r *http.Request) {
 	defer c.Close()
 	for {
 		mt, message, err := c.ReadMessage()
-                if err != nil {
-                        log.Println("read:", err)
-                        break
-                }
+		if err != nil {
+			log.Println("read:", err)
+			break
+		}
 		log.Debug(message)
-		
 
 		err = c.WriteMessage(mt, []byte(sendmessage))
 		if err != nil {
@@ -81,27 +75,22 @@ func balance(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 }
-func pushBalance(userid int,balance int) {
-	log.Debug("Pushing " + strconv.Itoa(balance) + " to " + strconv.Itoa(userid) )
-}
-func getBalance(userid int) int {
-	var balance int
-	balance = rand.Intn(100)
-	log.Debug("Balance for " + strconv.Itoa(userid) + " = " + strconv.Itoa(balance))
-	return balance
+func home(w http.ResponseWriter, r *http.Request) {
+	//homeTemplate.Execute(w, "ws://"+r.Host+"/echo")
+	homeTemplate.Execute(w, "ws://"+r.Host+"/balance")
 }
 
 func updateData() {
 	balances := make(map[int]int)
-	var balance int
+	var mybalance int
 	for {
 		for i := 0; i < 100; i++ {
-			balance = getBalance(i)
-			if balance != balances[i] {
+			mybalance = balance.GetBalance(i)
+			if mybalance != balances[i] {
 				log.Debug("Current balance has changed")
-				balances[i] = balance
+				balances[i] = mybalance
 				// we need to push this to client
-				pushBalance(i,balance)
+				balance.PushBalance(i, mybalance)
 			}
 		}
 		time.Sleep(1000 * time.Millisecond)
@@ -121,7 +110,7 @@ func main() {
 
 	http.HandleFunc("/echo", echo)
 	http.HandleFunc("/", home)
-	http.HandleFunc("/balance", balance)
+	http.HandleFunc("/balance", balanceHandler)
 	log.Fatal(http.ListenAndServe(*addr, nil))
 
 }
