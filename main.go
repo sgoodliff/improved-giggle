@@ -79,6 +79,18 @@ func home(w http.ResponseWriter, r *http.Request) {
 	//homeTemplate.Execute(w, "ws://"+r.Host+"/echo")
 	homeTemplate.Execute(w, "ws://"+r.Host+"/balance")
 }
+func hubHomeHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println(r.URL)
+	if r.URL.Path != "/hubhome" {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	http.ServeFile(w, r, "html/home.html")
+}
 
 func updateData() {
 	balances := make(map[int]int)
@@ -107,10 +119,17 @@ func main() {
 	flag.Parse()
 
 	//go updateData()
+	hub := newHub()
+	go hub.run()
 
 	http.HandleFunc("/echo", echo)
 	http.HandleFunc("/", home)
 	http.HandleFunc("/balance", balanceHandler)
+	http.HandleFunc("/hubhome", hubHomeHandler)
+	//http.HandleFunc("/hub", hubHandler)
+	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		serveWs(hub, w, r)
+	})
 	log.Fatal(http.ListenAndServe(*addr, nil))
 
 }
