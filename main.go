@@ -1,15 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"flag"
-	"fmt"
-	"html/template"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/sgoodliff/hello"
 
 	"github.com/sgoodliff/improved-giggle/balance"
 	log "github.com/sirupsen/logrus"
@@ -27,61 +25,17 @@ func init() {
 	log.SetLevel(log.DebugLevel)
 }
 
-var addr = flag.String("addr", "localhost:8080", "http service address")
+var (
+	newline = []byte{'\n'}
+	space   = []byte{' '}
 
-var upgrader = websocket.Upgrader{} // use default options
+	addr     = flag.String("addr", "localhost:8080", "http service address")
+	upgrader = websocket.Upgrader{} // use default options
+)
 
-func echo(w http.ResponseWriter, r *http.Request) {
-	c, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Print("upgrade:", err)
-		return
-	}
-	defer c.Close()
-	for {
-		mt, message, err := c.ReadMessage()
-		if err != nil {
-			log.Println("read:", err)
-			break
-		}
-		log.Printf("recv: %s", message)
-		err = c.WriteMessage(mt, message)
-		if err != nil {
-			log.Println("write:", err)
-			break
-		}
-	}
-}
-func balanceHandler(w http.ResponseWriter, r *http.Request) {
-	var sendmessage = "test message"
-	c, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Print("balance upgrade:", err)
-		return
-	}
-	defer c.Close()
-	for {
-		mt, message, err := c.ReadMessage()
-		if err != nil {
-			log.Println("read:", err)
-			break
-		}
-		log.Debug(message)
-
-		err = c.WriteMessage(mt, []byte(sendmessage))
-		if err != nil {
-			log.Println("write:", err)
-			break
-		}
-	}
-}
-func home(w http.ResponseWriter, r *http.Request) {
-	//homeTemplate.Execute(w, "ws://"+r.Host+"/echo")
-	homeTemplate.Execute(w, "ws://"+r.Host+"/balance")
-}
-func hubHomeHandler(w http.ResponseWriter, r *http.Request) {
+func balanceHomeHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println(r.URL)
-	if r.URL.Path != "/hubhome" {
+	if r.URL.Path != "/home" {
 		http.Error(w, "Not found", http.StatusNotFound)
 		return
 	}
@@ -92,6 +46,27 @@ func hubHomeHandler(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "html/home.html")
 }
 
+func balanceHandler(w http.ResponseWriter, r *http.Request) {
+	b := []byte("Hello, goodbye, etc!")
+	c, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Print("upgrade:", err)
+		return
+	}
+	defer c.Close()
+	for {
+
+		b = bytes.TrimSpace(bytes.Replace(b, newline, space, -1))
+		log.Printf("recv: %s", b)
+		err = c.WriteMessage(websocket.TextMessage, b)
+		if err != nil {
+			log.Println("write:", err)
+			break
+		}
+		time.Sleep(1000 * time.Millisecond)
+
+	}
+}
 func updateData() {
 	balances := make(map[int]int)
 	var mybalance int
@@ -105,110 +80,19 @@ func updateData() {
 				balance.PushBalance(i, mybalance)
 			}
 		}
-		time.Sleep(1000 * time.Millisecond)
+		time.Sleep(10000 * time.Millisecond)
 	}
 }
 
 func main() {
-
-	log.Info("Hello, World")
-	var x string
-	x = hello.Hello()
-	fmt.Printf(x)
-
-	flag.Parse()
-
-	//go updateData()
 	hub := newHub()
 	go hub.run()
-
-	http.HandleFunc("/echo", echo)
-	http.HandleFunc("/", home)
-	http.HandleFunc("/balance", balanceHandler)
-	http.HandleFunc("/hubhome", hubHomeHandler)
-	//http.HandleFunc("/hub", hubHandler)
+	log.Info("Hello, World")
+	//go updateData()
+	http.HandleFunc("/home", balanceHomeHandler)
+	//	http.HandleFunc("/ws", balanceHandler)
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		serveWs(hub, w, r)
 	})
 	log.Fatal(http.ListenAndServe(*addr, nil))
-
 }
-
-var homeTemplate = template.Must(template.New("").Parse(`
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<script>
-window.addEventListener("load", function(evt) {
-
-    var output = document.getElementById("output");
-    var input = document.getElementById("input");
-    var ws;
-
-    var print = function(message) {
-        var d = document.createElement("div");
-        d.innerHTML = message;
-        output.appendChild(d);
-    };
-
-    document.getElementById("open").onclick = function(evt) {
-        if (ws) {
-            return false;
-        }
-        ws = new WebSocket("{{.}}");
-        ws.onopen = function(evt) {
-            print("OPEN");
-        }
-        ws.onclose = function(evt) {
-            print("CLOSE");
-            ws = null;
-        }
-        ws.onmessage = function(evt) {
-            print("RESPONSE: " + evt.data);
-        }
-        ws.onerror = function(evt) {
-            print("ERROR: " + evt.data);
-        }
-        return false;
-    };
-
-    document.getElementById("send").onclick = function(evt) {
-        if (!ws) {
-            return false;
-        }
-        print("SEND: " + input.value);
-        ws.send(input.value);
-        return false;
-    };
-
-    document.getElementById("close").onclick = function(evt) {
-        if (!ws) {
-            return false;
-        }
-        ws.close();
-        return false;
-    };
-
-});
-</script>
-</head>
-<body>
-<table>
-<tr><td valign="top" width="50%">
-<p>Click "Open" to create a connection to the server,
-"Send" to send a message to the server and "Close" to close the connection.
-You can change the message and send multiple times.
-<p>
-<form>
-<button id="open">Open</button>
-<button id="close">Close</button>
-<p><input id="input" type="text" value="Hello world!">
-<button id="send">Send</button>
-</form>
-</td><td valign="top" width="50%">
-<div id="output"></div>
-</td></tr></table>
-</body>
-</html>
-`))
