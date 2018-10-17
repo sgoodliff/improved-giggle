@@ -33,19 +33,6 @@ var (
 	upgrader = websocket.Upgrader{} // use default options
 )
 
-func balanceHomeHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println(r.URL)
-	if r.URL.Path != "/home" {
-		http.Error(w, "Not found", http.StatusNotFound)
-		return
-	}
-	if r.Method != "GET" {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	http.ServeFile(w, r, "html/home.html")
-}
-
 func balanceHandler(w http.ResponseWriter, r *http.Request) {
 	b := []byte("Hello, goodbye, etc!")
 	c, err := upgrader.Upgrade(w, r, nil)

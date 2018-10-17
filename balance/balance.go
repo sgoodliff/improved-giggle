@@ -2,10 +2,24 @@ package balance
 
 import (
 	"math/rand"
+	"net/http"
 	"strconv"
 
 	log "github.com/sirupsen/logrus"
 )
+
+func balanceHomeHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println(r.URL)
+	if r.URL.Path != "/home" {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	http.ServeFile(w, r, "html/home.html")
+}
 
 //PushBalance sends it back to the client
 func PushBalance(userid int, balance int) {
